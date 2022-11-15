@@ -6,11 +6,13 @@
             <span>{{ __('Customers') }}</span>
             <div class="d-flex">
                 <a href="{{ route('customers.create') }}" class="btn btn-primary me-2">{{ __('Import Customer') }}</a>
-                <form action="{{ route('customers.delete-all') }}" method="post">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-danger">{{ __('Delete all') }}</button>
-                </form>
+                @if($customers->total())
+                    <form action="{{ route('customers.delete-all') }}" method="post">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">{{ __('Delete all') }}</button>
+                    </form>
+                @endif
             </div>
         </div>
         <div class="card-body">

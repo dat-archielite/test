@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCustomerRequest;
 use App\Models\Customer;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use OpenSpout\Common\Exception\IOException;
 use OpenSpout\Common\Exception\UnsupportedTypeException;
@@ -24,23 +25,32 @@ class CustomerController extends Controller
      */
     public function store(StoreCustomerRequest $request)
     {
-        $path = $request->file('file')->store('csv');
+        try {
+            DB::beginTransaction();
+            $path = $request->file('file')->store('csv');
 
-        $customers = (new FastExcel())->import(Storage::disk('local')->path($path), function ($customer) {
-            return [
-                'id' => $customer['ID'],
-                'first_name' => $customer['First Name'],
-                'last_name' => $customer['Last Name'],
-                'email' => $customer['Email'],
-                'phone' => $customer['Phone'],
-            ];
-        });
-
-        collect($customers)
-            ->chunk(10000)
-            ->each(function ($chunk) {
-                Customer::insert($chunk->toArray());
+            $customers = (new FastExcel())->import(Storage::disk('local')->path($path), function ($customer) {
+                return [
+                    'id' => $customer['ID'],
+                    'first_name' => $customer['First Name'],
+                    'last_name' => $customer['Last Name'],
+                    'email' => $customer['Email'],
+                    'phone' => $customer['Phone'],
+                ];
             });
+
+            collect($customers)
+                ->chunk(10000)
+                ->each(function ($chunk) {
+                    Customer::insert($chunk->toArray());
+                });
+
+            Storage::disk('local')->delete($path);
+
+            DB::commit();
+        } catch (\Exception) {
+            DB::rollBack();
+        }
 
         return to_route('home')->with('success', __('Import CSV file successfully!'));
     }
@@ -49,6 +59,6 @@ class CustomerController extends Controller
     {
         Customer::truncate();
 
-        return to_route('home')->with('success', __('All customers has deleted successfully!'));
+        return to_route('home')->with('success', __('All customers have been deleted successfully!'));
     }
 }
