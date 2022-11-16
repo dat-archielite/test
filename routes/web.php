@@ -18,4 +18,5 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', HomeController::class)->name('home');
 
 Route::resource('customers', CustomerController::class)->only('create', 'store');
+Route::post('customers/export-all', [CustomerController::class, 'exportAll'])->name('customers.export-all');
 Route::delete('customers/delete-all', [CustomerController::class, 'deleteAll'])->name('customers.delete-all');

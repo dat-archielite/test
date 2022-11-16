@@ -7,6 +7,10 @@
             <div class="d-flex">
                 <a href="{{ route('customers.create') }}" class="btn btn-primary me-2">{{ __('Import Customer') }}</a>
                 @if($customers->total())
+                    <form action="{{ route('customers.export-all') }}" method="post">
+                        @csrf
+                        <button type="submit" class="btn btn-success me-2">{{ __('Export all') }}</button>
+                    </form>
                     <form action="{{ route('customers.delete-all') }}" method="post">
                         @csrf
                         @method('DELETE')
@@ -19,6 +23,15 @@
             @if(session('success'))
                 <div class="alert alert-success">
                     {{ session('success') }}
+                </div>
+            @endif
+            @if($errors->any())
+                <div class="alert alert-danger">
+                    <ul>
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
                 </div>
             @endif
             <div class="table-responsive">
