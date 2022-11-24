@@ -5,17 +5,14 @@ namespace App\Http\Controllers;
 use App\Events\DownloadedFile;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Models\Customer;
-use Illuminate\Session\Store;
-use Illuminate\Support\Benchmark;
+use Exception;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use OpenSpout\Common\Exception\InvalidArgumentException;
-use OpenSpout\Common\Exception\IOException;
-use OpenSpout\Common\Exception\UnsupportedTypeException;
-use OpenSpout\Reader\Exception\ReaderNotOpenedException;
-use OpenSpout\Writer\Exception\WriterNotOpenedException;
 use Rap2hpoutre\FastExcel\FastExcel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class CustomerController extends Controller
 {
@@ -26,50 +23,58 @@ class CustomerController extends Controller
 
     public function store(StoreCustomerRequest $request)
     {
-        Benchmark::dd(function () use ($request) {
-            try {
-                DB::beginTransaction();
-                $path = $request->file('file')->store('csv');
+        $disk = Storage::disk('local');
 
-                $customers = (new FastExcel())->import($disk->path($path), function ($customer) {
-                    return [
-                        'first_name' => $customer['First Name'],
-                        'last_name' => $customer['Last Name'],
-                        'email' => $customer['Email'],
-                        'phone' => $customer['Phone'],
-                    ];
-                });
+        $path = $request->file('file')->store('csv');
 
-                foreach (array_chunk($customers->toArray(), 10000) as $customers) {
-                    Customer::insertOrIgnore($customers);
-                }
-
-                $disk->delete($path);
-
-                DB::commit();
-
-                return to_route('home')->with('success', __('Import CSV file successfully!'));
-            } catch (\Exception) {
-                DB::rollBack();
-
-                return to_route('home')->withErrors([
-                    'file' => [__('Has errors when uploading file')],
-                ]);
-            }
+        $customers = (new FastExcel())->import($disk->path($path), function ($customer) {
+            return [
+                'first_name' => $customer['First Name'],
+                'last_name' => $customer['Last Name'],
+                'email' => $customer['Email'],
+                'phone' => $customer['Phone'],
+            ];
         });
+
+//        foreach ($customers as $key => $customer) {
+//            $validator = Validator::make($customer, [
+//                'first_name' => 'required|min:3|max:50',
+//                'last_name' => 'required|min:3|max:50',
+//                'email' => 'required|email',
+//                'phone' => 'required|min:10|max:20',
+//            ]);
+//
+//            if ($validator->fails()) {
+//                $validator->errors()->add($key, $validator->getMessageBag()->first());
+//            }
+//        }
+
+        try {
+            DB::beginTransaction();
+
+            foreach (array_chunk($customers->toArray(), 10000) as $customers) {
+                Customer::insert($customers);
+            }
+
+            $disk->delete($path);
+
+            DB::commit();
+
+            return to_route('home')->with('success', __('Import CSV file successfully!'));
+        } catch (Exception) {
+            DB::rollBack();
+
+            return to_route('home')->withErrors(['file' => __('Has errors when uploading file')]);
+        }
     }
 
-    /**
-     * @throws IOException
-     * @throws WriterNotOpenedException
-     * @throws UnsupportedTypeException
-     * @throws InvalidArgumentException
-     */
-    public function exportAll()
+    public function export(): BinaryFileResponse
     {
         $disk = Storage::disk('local');
 
-        (new FastExcel(Customer::all()))->export($disk->path('customers.csv'), function (Customer $customer) {
+        $customers = new FastExcel(Customer::select(['phone', 'email', 'first_name', 'last_name'])->get());
+
+        $customers->export($disk->path('customers.csv'), function (Customer $customer) {
             return [
                 'Phone' => $customer->phone,
                 'Email' => $customer->email,
@@ -80,10 +85,10 @@ class CustomerController extends Controller
 
         DownloadedFile::dispatch('customers.csv');
 
-        return $disk->download('customers.csv');
+        return response()->download($disk->path('customers.csv'))->deleteFileAfterSend();
     }
 
-    public function deleteAll()
+    public function truncate(): RedirectResponse
     {
         Customer::truncate();
 

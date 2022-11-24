@@ -7,14 +7,14 @@
             <div class="d-flex">
                 <a href="{{ route('customers.create') }}" class="btn btn-primary me-2">{{ __('Import Customer') }}</a>
                 @if($customers->total())
-                    <form action="{{ route('customers.export-all') }}" method="post">
+                    <form action="{{ route('customers.export') }}" method="post">
                         @csrf
-                        <button type="submit" class="btn btn-success me-2">{{ __('Export all') }}</button>
+                        <button type="submit" class="btn btn-success me-2">{{ __('Export') }}</button>
                     </form>
-                    <form action="{{ route('customers.delete-all') }}" method="post">
+                    <form action="{{ route('customers.truncate') }}" method="post">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-danger">{{ __('Delete all') }}</button>
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('delete?')">{{ __('Truncate') }}</button>
                     </form>
                 @endif
             </div>
